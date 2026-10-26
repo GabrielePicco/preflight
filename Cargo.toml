@@ -9,7 +9,7 @@ license = "MIT"
 readme = "README.md"
 keywords = ["security", "ai-agents", "codex", "claude-code", "cli"]
 categories = ["command-line-utilities"]
-exclude = [".github/**"]
+exclude = ["demo/*.png", ".github/**"]
 
 [lib]
 name = "preflight"

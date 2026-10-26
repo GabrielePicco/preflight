@@ -1,5 +1,7 @@
 # preflight
 
+![preflight status: BLOCKED](demo/status-blocked.png)
+
 **A pre-flight check for coding agents.** Before `codex`, `claude` or `gemini` starts, `preflight`
 shows supported instruction files, MCP servers, permission settings and secret-looking filenames
 in reach, and **refuses to launch** if any instruction file is new or has changed since you last
@@ -84,6 +86,10 @@ Flags: `--color auto|always|never`, `status --no-contents`, `status --no-version
 | SECRETS IN REACH | `.env*`, `*.pem`, `id_rsa`, `credentials.json`, ... by **name only**; contents are never read |
 | excerpts | full text of every untrusted file with suspicious spans highlighted; invisible and control characters shown as `⟨U+200B⟩` |
 | verdict | `GO` or `BLOCKED`, the reasons, and warnings |
+
+After trusting:
+
+![preflight status: GO](demo/status-go.png)
 
 ### What it checks
 
