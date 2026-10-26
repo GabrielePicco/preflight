@@ -1,11 +1,19 @@
 # preflight
 
 **A pre-flight check for coding agents.** Before `codex`, `claude` or `gemini` starts, `preflight`
-shows you every instruction file, MCP server, permission setting and secret file the agent is about
-to inherit, and **refuses to launch** if any instruction file is new or has changed since you last
+shows supported instruction files, MCP servers, permission settings and secret-looking filenames
+in reach, and **refuses to launch** if any instruction file is new or has changed since you last
 approved it.
 
-![preflight status: BLOCKED](demo/status-blocked.png)
+## What it is / isn’t
+
+preflight is a local review step and file-hash gate for launches you route through it.
+The Cargo package is `agent-preflight`; the executable is `preflight`.
+
+It is not a sandbox, malware scanner, or complete security boundary. **Heuristics are
+not a security boundary:** they can miss attacks and flag harmless text. A trusted
+file can still be malicious. Keep each agent’s built-in folder trust, sandbox, and
+approval controls enabled.
 
 ## Why
 
@@ -24,8 +32,19 @@ detection-and-prevention tool written in response. It is not affiliated with Ope
 
 ## Install
 
+Install the published package from crates.io with Cargo (recommended):
+
 ```sh
-cargo install --path .          # from a checkout; builds a single binary
+cargo install agent-preflight --locked
+preflight --help
+```
+
+Alternatively, build from GitHub or a local checkout:
+
+```sh
+cargo install --git https://github.com/GabrielePicco/preflight --locked agent-preflight
+# Or from a checkout:
+cargo install --path . --locked
 preflight --help
 ```
 
@@ -66,10 +85,6 @@ Flags: `--color auto|always|never`, `status --no-contents`, `status --no-version
 | excerpts | full text of every untrusted file with suspicious spans highlighted; invisible and control characters shown as `⟨U+200B⟩` |
 | verdict | `GO` or `BLOCKED`, the reasons, and warnings |
 
-After trusting:
-
-![preflight status: GO](demo/status-go.png)
-
 ### What it checks
 
 1. **Discovery.** From the current directory up to `$HOME` (or `/`), it looks for `AGENTS.md`,
@@ -78,7 +93,7 @@ After trusting:
    `.claude/{commands,agents,skills}`, `.codex/prompts`, `.cursor/rules`, `.gemini/commands` and
    `.github/instructions` directories. The walk deliberately **does not stop at the git root**: a repo
    cloned into `~/Downloads` still sees a planted `~/Downloads/AGENTS.md`.
-2. **Trust list (the security boundary).** `~/.config/preflight/trusted.json` maps each absolute path to
+2. **Trust list (the launch gate).** `~/.config/preflight/trusted.json` maps each absolute path to
    the SHA-256 of the content you approved. A new or changed file is a hard BLOCK, and its contents are
    printed so you can read them before running `preflight trust`.
 3. **Provenance.** Files under `~/Downloads` or a temp directory, files carrying the macOS
@@ -143,34 +158,36 @@ What preflight adds on top:
 - **Coverage is a list.** New agents, file names or config schemas need updates. The settings and MCP
   parsing follows each agent's documented format on a best-effort basis and may miss keys.
 - **Provenance is best-effort.** `~/Downloads` and temp checks are path-based. The xattr check was tested
-  on Linux (`user.xdg.origin.url`). The macOS quarantine / WhereFroms and Windows Zone.Identifier
-  readers are implemented but have not been tested on those OSes. `git clone` doesn't set these marks
-  at all.
+  on Linux (`user.xdg.origin.url`) and on macOS with a file saved from Chrome over HTTPS
+  (quarantine and binary-plist WhereFroms). Windows Zone.Identifier remains unverified.
+  `git clone` doesn't set these marks at all.
 - **The secrets list is by name.** It doesn't scan file contents, so it's a reminder, not a DLP tool.
-- **Not tested against real agents yet.** Version probes and config locations follow public docs.
-  The test suite uses fake HOMEs and stub agents.
-
-## Demo
-
-```sh
-cargo build --release
-./demo/demo.sh             # status BLOCKED -> run refused -> trust -> GO -> run -> edit -> CHANGED
-./demo/screenshots.sh      # regenerates demo/*.png (needs python3 and Chrome/Chromium)
-```
-
-The demo builds a fake `$HOME` under `demo/sandbox/` with a "downloaded" repo whose `AGENTS.md`
-hides a comment telling the agent to run `echo PWNED > /tmp/preflight-canary`. That is a harmless
-canary. preflight only displays it, and the script checks at the end that the canary file was never
-created. The `codex` used in the demo is a stub shell script that just prints a line.
+- **Config coverage is limited.** Codex and Claude config parsing has been checked on macOS;
+  Gemini uses synthetic fixtures. Actual agent sessions and their trust enforcement have not
+  been tested. Unknown config keys, profiles, and precedence remain best-effort.
+- **Output can contain sensitive information.** Redaction is heuristic: paths, project names,
+  URLs, and unrecognized secrets can appear. Review output before sharing it.
 
 ## Development
 
 ```sh
-cargo test
-cargo clippy --all-targets
+cargo fmt --check
+cargo test --locked
+cargo clippy --locked --all-targets -- -D warnings
 ```
 
 Exit codes: `0` GO, `3` BLOCKED, `2` error. `run` returns the agent's own exit code.
+
+## Build artifacts
+
+CI builds, tests, and lints on Ubuntu and macOS. Windows has a build-only job whose
+failure is allowed. The tag-triggered workflow packages macOS arm64, macOS x86_64,
+and Linux x86_64 (glibc) binaries with SHA-256 checksums as workflow artifacts.
+It does not create GitHub Releases or publish packages. Binaries are not signed or
+notarized.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and
+[CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

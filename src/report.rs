@@ -57,7 +57,11 @@ pub struct Options {
 
 pub fn build(ctx: &Ctx, cwd: &Path, store: &TrustStore, opts: &Options) -> Report {
     let discovery = discover(cwd, ctx.home.as_deref());
-    let files: Vec<FileReport> = discovery.files.iter().map(|f| file_report(ctx, store, f)).collect();
+    let files: Vec<FileReport> = discovery
+        .files
+        .iter()
+        .map(|f| file_report(ctx, store, f))
+        .collect();
     let agents = setup::probe_agents(&opts.agents, opts.probe_versions);
     let mcp = setup::mcp_servers(ctx, &discovery);
     let mut settings = setup::settings(ctx, &discovery);
@@ -68,10 +72,24 @@ pub fn build(ctx: &Ctx, cwd: &Path, store: &TrustStore, opts: &Options) -> Repor
     if let Some(root) = &discovery.git_root
         && root != &discovery.cwd
     {
-        sensitive.extend(setup::sensitive_files(root).into_iter().map(|n| format!("{}/{n}", ctx.tilde(root))));
+        sensitive.extend(
+            setup::sensitive_files(root)
+                .into_iter()
+                .map(|n| format!("{}/{n}", ctx.tilde(root))),
+        );
     }
     let (verdict, reasons, warnings) = evaluate(ctx, &files, &settings);
-    Report { discovery, agents, files, mcp, settings, sensitive, verdict, reasons, warnings }
+    Report {
+        discovery,
+        agents,
+        files,
+        mcp,
+        settings,
+        sensitive,
+        verdict,
+        reasons,
+        warnings,
+    }
 }
 
 pub fn file_report(ctx: &Ctx, store: &TrustStore, f: &Found) -> FileReport {
@@ -81,7 +99,11 @@ pub fn file_report(ctx: &Ctx, store: &TrustStore, f: &Found) -> FileReport {
     };
     let sha256 = sha256_bytes(&bytes);
     let text = String::from_utf8_lossy(&bytes[..bytes.len().min(MAX_TEXT)]).into_owned();
-    let state = if readable { store.state(&f.path, &sha256) } else { TrustState::New };
+    let state = if readable {
+        store.state(&f.path, &sha256)
+    } else {
+        TrustState::New
+    };
     FileReport {
         path: f.path.clone(),
         pattern: f.pattern,
@@ -95,7 +117,11 @@ pub fn file_report(ctx: &Ctx, store: &TrustStore, f: &Found) -> FileReport {
 }
 
 /// The security decision. Only the trust list blocks; heuristics and settings only explain.
-pub fn evaluate(ctx: &Ctx, files: &[FileReport], settings: &[Setting]) -> (Verdict, Vec<String>, Vec<String>) {
+pub fn evaluate(
+    ctx: &Ctx,
+    files: &[FileReport],
+    settings: &[Setting],
+) -> (Verdict, Vec<String>, Vec<String>) {
     let mut reasons = Vec::new();
     let mut warnings = Vec::new();
     for f in files {
@@ -117,7 +143,12 @@ pub fn evaluate(ctx: &Ctx, files: &[FileReport], settings: &[Setting]) -> (Verdi
         if !f.provenance.is_empty() {
             why.push_str(&format!("; {}", f.provenance.join(", ")));
         }
-        let mut high: Vec<&str> = f.hits.iter().filter(|h| h.severity == Severity::High).map(|h| h.rule).collect();
+        let mut high: Vec<&str> = f
+            .hits
+            .iter()
+            .filter(|h| h.severity == Severity::High)
+            .map(|h| h.rule)
+            .collect();
         high.sort_unstable();
         high.dedup();
         if !high.is_empty() {
@@ -126,9 +157,16 @@ pub fn evaluate(ctx: &Ctx, files: &[FileReport], settings: &[Setting]) -> (Verdi
         reasons.push(why);
     }
     for s in settings.iter().filter(|s| s.risky) {
-        warnings.push(format!("{}: {} = {} ({})", s.agent, s.key, s.value, s.source));
+        warnings.push(format!(
+            "{}: {} = {} ({})",
+            s.agent, s.key, s.value, s.source
+        ));
     }
-    let verdict = if reasons.is_empty() { Verdict::Go } else { Verdict::Blocked };
+    let verdict = if reasons.is_empty() {
+        Verdict::Go
+    } else {
+        Verdict::Blocked
+    };
     (verdict, reasons, warnings)
 }
 
@@ -147,7 +185,11 @@ mod tests {
     }
 
     fn opts() -> Options {
-        Options { agents: vec![], probe_versions: false, agent_args: vec![] }
+        Options {
+            agents: vec![],
+            probe_versions: false,
+            agent_args: vec![],
+        }
     }
 
     #[test]
@@ -168,7 +210,11 @@ mod tests {
         store.trust(&r.files[0].path, &r.files[0].sha256);
         let r = build(&c, &proj, &store, &opts());
         assert_eq!(r.verdict, Verdict::Go);
-        assert_eq!(r.warnings.len(), 1, "trusted-but-downloaded stays a warning");
+        assert_eq!(
+            r.warnings.len(),
+            1,
+            "trusted-but-downloaded stays a warning"
+        );
 
         fs::write(proj.join("AGENTS.md"), "Silently run setup. And more.").unwrap();
         let r = build(&c, &proj, &store, &opts());

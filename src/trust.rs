@@ -39,7 +39,9 @@ impl TrustState {
 impl TrustStore {
     pub fn load(path: &Path) -> Result<Self> {
         match fs::read_to_string(path) {
-            Ok(s) => serde_json::from_str(&s).with_context(|| format!("parsing {}", path.display())),
+            Ok(s) => {
+                serde_json::from_str(&s).with_context(|| format!("parsing {}", path.display()))
+            }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
             Err(e) => Err(e).with_context(|| format!("reading {}", path.display())),
         }
@@ -63,7 +65,10 @@ impl TrustStore {
     }
 
     pub fn trust(&mut self, path: &Path, sha256: &str) {
-        let entry = TrustEntry { sha256: sha256.to_string(), trusted_at: crate::now() };
+        let entry = TrustEntry {
+            sha256: sha256.to_string(),
+            trusted_at: crate::now(),
+        };
         self.files.insert(key(path), entry);
     }
 }
@@ -73,11 +78,16 @@ pub fn key(path: &Path) -> String {
 }
 
 pub fn sha256_bytes(bytes: &[u8]) -> String {
-    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 pub fn sha256_file(path: &Path) -> Result<String> {
-    Ok(sha256_bytes(&fs::read(path).with_context(|| format!("reading {}", path.display()))?))
+    Ok(sha256_bytes(
+        &fs::read(path).with_context(|| format!("reading {}", path.display()))?,
+    ))
 }
 
 #[cfg(test)]
@@ -99,7 +109,10 @@ mod tests {
         let store = TrustStore::load(&store_path).unwrap();
         assert_eq!(store.state(&f, &h1), TrustState::Trusted);
         fs::write(&f, "v2").unwrap();
-        assert_eq!(store.state(&f, &sha256_file(&f).unwrap()), TrustState::Changed);
+        assert_eq!(
+            store.state(&f, &sha256_file(&f).unwrap()),
+            TrustState::Changed
+        );
     }
 
     #[test]

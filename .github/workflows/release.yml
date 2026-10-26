@@ -1,0 +1,43 @@
+name: Build release artifacts
+
+# Builds workflow artifacts without publishing releases or packages.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable Rust
+        run: rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
+      - run: cargo +stable build --release --locked --target ${{ matrix.target }}
+      - name: Package binary and license
+        shell: bash
+        run: |
+          mkdir -p dist/package
+          cp target/${{ matrix.target }}/release/preflight LICENSE README.md dist/package/
+          tar -czf dist/agent-preflight-${{ matrix.target }}.tar.gz -C dist/package .
+          cd dist
+          shasum -a 256 agent-preflight-${{ matrix.target }}.tar.gz > agent-preflight-${{ matrix.target }}.tar.gz.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-preflight-${{ matrix.target }}
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+          if-no-files-found: error

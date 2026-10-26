@@ -36,12 +36,14 @@ impl Ctx {
         let base = home.clone().unwrap_or_else(|| PathBuf::from("."));
         let config = env_path("XDG_CONFIG_HOME").unwrap_or_else(|| base.join(".config"));
         let state = env_path("XDG_STATE_HOME").unwrap_or_else(|| base.join(".local/state"));
-        let trust_file =
-            env_path("PREFLIGHT_TRUST_FILE").unwrap_or_else(|| config.join("preflight/trusted.json"));
+        let trust_file = env_path("PREFLIGHT_TRUST_FILE")
+            .unwrap_or_else(|| config.join("preflight/trusted.json"));
         let log_file =
             env_path("PREFLIGHT_LOG_FILE").unwrap_or_else(|| state.join("preflight/log.jsonl"));
         let raw: Vec<PathBuf> = match std::env::var_os("PREFLIGHT_TEMP_ROOTS") {
-            Some(s) => std::env::split_paths(&s).filter(|p| !p.as_os_str().is_empty()).collect(),
+            Some(s) => std::env::split_paths(&s)
+                .filter(|p| !p.as_os_str().is_empty())
+                .collect(),
             None => {
                 let mut v = vec![std::env::temp_dir()];
                 v.extend(["/tmp", "/var/tmp", "/private/tmp", "/dev/shm"].map(PathBuf::from));
@@ -55,7 +57,12 @@ impl Ctx {
                 temp_roots.push(p);
             }
         }
-        Ctx { home, trust_file, log_file, temp_roots }
+        Ctx {
+            home,
+            trust_file,
+            log_file,
+            temp_roots,
+        }
     }
 
     /// Show a path with `$HOME` replaced by `~`.
@@ -74,7 +81,9 @@ impl Ctx {
 }
 
 fn env_path(key: &str) -> Option<PathBuf> {
-    std::env::var_os(key).filter(|v| !v.is_empty()).map(PathBuf::from)
+    std::env::var_os(key)
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
 }
 
 /// Seconds since the Unix epoch.

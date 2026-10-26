@@ -43,7 +43,11 @@ pub fn which(name: &str) -> Option<PathBuf> {
         let p = PathBuf::from(name);
         return p.is_file().then_some(p);
     }
-    let exts: &[&str] = if cfg!(windows) { &[".exe", ".cmd", ".bat", ""] } else { &[""] };
+    let exts: &[&str] = if cfg!(windows) {
+        &[".exe", ".cmd", ".bat", ""]
+    } else {
+        &[""]
+    };
     std::env::split_paths(&std::env::var_os("PATH")?)
         .flat_map(|dir| exts.iter().map(move |e| dir.join(format!("{name}{e}"))))
         .find(|p| p.is_file())
@@ -62,7 +66,9 @@ pub fn version(path: &Path) -> Option<String> {
     loop {
         match child.try_wait() {
             Ok(Some(_)) => break,
-            Ok(None) if start.elapsed() < Duration::from_secs(4) => std::thread::sleep(Duration::from_millis(25)),
+            Ok(None) if start.elapsed() < Duration::from_secs(4) => {
+                std::thread::sleep(Duration::from_millis(25))
+            }
             _ => {
                 let _ = child.kill();
                 let _ = child.wait();
@@ -83,8 +89,16 @@ pub fn probe_agents(names: &[String], with_version: bool) -> Vec<AgentInfo> {
         .map(|name| {
             std::thread::spawn(move || {
                 let path = which(&name);
-                let version = if with_version { path.as_deref().and_then(version) } else { None };
-                AgentInfo { name, path, version }
+                let version = if with_version {
+                    path.as_deref().and_then(version)
+                } else {
+                    None
+                };
+                AgentInfo {
+                    name,
+                    path,
+                    version,
+                }
             })
         })
         .collect();
@@ -127,11 +141,20 @@ pub fn mcp_servers(ctx: &Ctx, disc: &Discovery) -> Vec<McpServer> {
         ctx,
         disc,
         &[".gemini/settings.json", ".cursor/mcp.json"],
-        &[".mcp.json", ".cursor/mcp.json", ".gemini/settings.json", ".vscode/mcp.json"],
+        &[
+            ".mcp.json",
+            ".cursor/mcp.json",
+            ".gemini/settings.json",
+            ".vscode/mcp.json",
+        ],
     );
     for p in json_files {
         if let Some(v) = read_json(&p) {
-            let key = if p.ends_with(".vscode/mcp.json") { "servers" } else { "mcpServers" };
+            let key = if p.ends_with(".vscode/mcp.json") {
+                "servers"
+            } else {
+                "mcpServers"
+            };
             json_servers(v.get(key), &ctx.tilde(&p), &mut out);
         }
     }
@@ -149,9 +172,17 @@ pub fn mcp_servers(ctx: &Ctx, disc: &Discovery) -> Vec<McpServer> {
                             .unwrap_or_default();
                         redact_command(cmd, &args)
                     }
-                    None => cfg.get("url").and_then(|u| u.as_str()).map(redact_url).unwrap_or_else(|| "?".into()),
+                    None => cfg
+                        .get("url")
+                        .and_then(|u| u.as_str())
+                        .map(redact_url)
+                        .unwrap_or_else(|| "?".into()),
                 };
-                out.push(McpServer { name: name.clone(), target, source: ctx.tilde(&p) });
+                out.push(McpServer {
+                    name: name.clone(),
+                    target,
+                    source: ctx.tilde(&p),
+                });
             }
         }
     }
@@ -162,7 +193,11 @@ pub fn mcp_servers(ctx: &Ctx, disc: &Discovery) -> Vec<McpServer> {
         if let Some(projects) = v.get("projects").and_then(|p| p.as_object()) {
             for dir in &disc.scanned {
                 if let Some(p) = projects.get(&dir.to_string_lossy().into_owned()) {
-                    json_servers(p.get("mcpServers"), &format!("~/.claude.json [{}]", ctx.tilde(dir)), &mut out);
+                    json_servers(
+                        p.get("mcpServers"),
+                        &format!("~/.claude.json [{}]", ctx.tilde(dir)),
+                        &mut out,
+                    );
                 }
             }
         }
@@ -171,7 +206,9 @@ pub fn mcp_servers(ctx: &Ctx, disc: &Discovery) -> Vec<McpServer> {
 }
 
 fn json_servers(servers: Option<&Value>, source: &str, out: &mut Vec<McpServer>) {
-    let Some(obj) = servers.and_then(|s| s.as_object()) else { return };
+    let Some(obj) = servers.and_then(|s| s.as_object()) else {
+        return;
+    };
     for (name, cfg) in obj {
         let target = if let Some(cmd) = cfg.get("command").and_then(|c| c.as_str()) {
             let args: Vec<&str> = cfg
@@ -180,24 +217,45 @@ fn json_servers(servers: Option<&Value>, source: &str, out: &mut Vec<McpServer>)
                 .map(|a| a.iter().filter_map(|x| x.as_str()).collect())
                 .unwrap_or_default();
             redact_command(cmd, &args)
-        } else if let Some(url) = ["url", "httpUrl", "serverUrl"].iter().find_map(|k| cfg.get(*k).and_then(|u| u.as_str())) {
+        } else if let Some(url) = ["url", "httpUrl", "serverUrl"]
+            .iter()
+            .find_map(|k| cfg.get(*k).and_then(|u| u.as_str()))
+        {
             redact_url(url)
         } else {
             "?".into()
         };
-        out.push(McpServer { name: name.clone(), target, source: source.to_string() });
+        out.push(McpServer {
+            name: name.clone(),
+            target,
+            source: source.to_string(),
+        });
     }
 }
 
 fn secret_word(s: &str) -> bool {
     let l = s.to_ascii_lowercase();
-    ["key", "token", "secret", "pass", "auth", "bearer", "cookie"].iter().any(|k| l.contains(k))
+    ["key", "token", "secret", "pass", "auth", "bearer", "cookie"]
+        .iter()
+        .any(|k| l.contains(k))
 }
 
 fn looks_secret(a: &str) -> bool {
-    const PREFIXES: &[&str] = &["sk-", "ghp_", "gho_", "github_pat_", "xox", "AKIA", "glpat-", "hf_", "Bearer "];
+    const PREFIXES: &[&str] = &[
+        "sk-",
+        "ghp_",
+        "gho_",
+        "github_pat_",
+        "xox",
+        "AKIA",
+        "glpat-",
+        "hf_",
+        "Bearer ",
+    ];
     PREFIXES.iter().any(|p| a.starts_with(p))
-        || (a.len() >= 32 && a.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-'))
+        || (a.len() >= 32
+            && a.chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-'))
 }
 
 /// Render a server command line with anything secret-looking replaced, so the panel is
@@ -241,7 +299,13 @@ pub fn settings(ctx: &Ctx, disc: &Discovery) -> Vec<Setting> {
 }
 
 fn push(out: &mut Vec<Setting>, agent: &str, key: &str, value: String, risky: bool, source: &str) {
-    out.push(Setting { agent: agent.into(), key: key.into(), value, risky, source: source.into() });
+    out.push(Setting {
+        agent: agent.into(),
+        key: key.into(),
+        value,
+        risky,
+        source: source.into(),
+    });
 }
 
 fn claude_settings(ctx: &Ctx, disc: &Discovery, out: &mut Vec<Setting>) {
@@ -254,28 +318,64 @@ fn claude_settings(ctx: &Ctx, disc: &Discovery, out: &mut Vec<Setting>) {
     for p in files {
         let Some(v) = read_json(&p) else { continue };
         let src = ctx.tilde(&p);
-        if let Some(mode) = v.pointer("/permissions/defaultMode").and_then(|m| m.as_str()) {
-            push(out, "claude", "defaultMode", mode.into(), mode == "bypassPermissions", &src);
+        if let Some(mode) = v
+            .pointer("/permissions/defaultMode")
+            .and_then(|m| m.as_str())
+        {
+            push(
+                out,
+                "claude",
+                "defaultMode",
+                mode.into(),
+                mode == "bypassPermissions",
+                &src,
+            );
         }
         if let Some(allow) = v.pointer("/permissions/allow").and_then(|a| a.as_array())
             && !allow.is_empty()
         {
             let rules: Vec<&str> = allow.iter().filter_map(|r| r.as_str()).collect();
-            let broad = rules.iter().any(|r| matches!(*r, "Bash" | "Bash(*)" | "Bash(**)" | "*"));
+            let broad = rules
+                .iter()
+                .any(|r| matches!(*r, "Bash" | "Bash(*)" | "Bash(**)" | "*"));
             let mut shown = rules.iter().take(3).copied().collect::<Vec<_>>().join(", ");
             if rules.len() > 3 {
                 shown.push_str(", …");
             }
-            push(out, "claude", "allow", format!("{} rules: {shown}", rules.len()), broad, &src);
+            push(
+                out,
+                "claude",
+                "allow",
+                format!("{} rules: {shown}", rules.len()),
+                broad,
+                &src,
+            );
         }
         if let Some(hooks) = v.get("hooks").and_then(|h| h.as_object())
             && !hooks.is_empty()
         {
             let events = hooks.keys().cloned().collect::<Vec<_>>().join(", ");
-            push(out, "claude", "hooks", format!("{events} (run shell commands)"), true, &src);
+            push(
+                out,
+                "claude",
+                "hooks",
+                format!("{events} (run shell commands)"),
+                true,
+                &src,
+            );
         }
-        if v.get("enableAllProjectMcpServers").and_then(|b| b.as_bool()) == Some(true) {
-            push(out, "claude", "enableAllProjectMcpServers", "true".into(), true, &src);
+        if v.get("enableAllProjectMcpServers")
+            .and_then(|b| b.as_bool())
+            == Some(true)
+        {
+            push(
+                out,
+                "claude",
+                "enableAllProjectMcpServers",
+                "true".into(),
+                true,
+                &src,
+            );
         }
     }
     if let Some(h) = &ctx.home
@@ -293,7 +393,14 @@ fn claude_settings(ctx: &Ctx, disc: &Discovery, out: &mut Vec<Setting>) {
             Some(d) => format!("accepted for {}", ctx.tilde(d)),
             None => "not accepted here yet".into(),
         };
-        push(out, "claude", "folder trust", value, false, "~/.claude.json");
+        push(
+            out,
+            "claude",
+            "folder trust",
+            value,
+            false,
+            "~/.claude.json",
+        );
     }
 }
 
@@ -317,7 +424,14 @@ fn codex_settings(ctx: &Ctx, disc: &Discovery, out: &mut Vec<Setting>) {
                     .and_then(|p| p.get("trust_level"))
                     .and_then(|l| l.as_str())
                 {
-                    push(out, "codex", "trust_level", format!("{level} for {}", ctx.tilde(dir)), false, &src);
+                    push(
+                        out,
+                        "codex",
+                        "trust_level",
+                        format!("{level} for {}", ctx.tilde(dir)),
+                        false,
+                        &src,
+                    );
                 }
             }
         }
@@ -325,16 +439,24 @@ fn codex_settings(ctx: &Ctx, disc: &Discovery, out: &mut Vec<Setting>) {
 }
 
 fn gemini_settings(ctx: &Ctx, disc: &Discovery, out: &mut Vec<Setting>) {
-    for p in config_files(ctx, disc, &[".gemini/settings.json"], &[".gemini/settings.json"]) {
+    for p in config_files(
+        ctx,
+        disc,
+        &[".gemini/settings.json"],
+        &[".gemini/settings.json"],
+    ) {
         let Some(v) = read_json(&p) else { continue };
         let mut leaves = Vec::new();
         flatten("", &v, &mut leaves);
         for (key, val) in leaves {
             let last = key.rsplit('.').next().unwrap_or(&key);
-            let interesting = matches!(last, "autoAccept" | "approvalMode" | "defaultApprovalMode" | "yolo" | "sandbox")
-                || key.contains("folderTrust");
+            let interesting = matches!(
+                last,
+                "autoAccept" | "approvalMode" | "defaultApprovalMode" | "yolo" | "sandbox"
+            ) || key.contains("folderTrust");
             if interesting {
-                let risky = ((last == "autoAccept" || last == "yolo") && val == "true") || val.contains("yolo");
+                let risky = ((last == "autoAccept" || last == "yolo") && val == "true")
+                    || val.contains("yolo");
                 push(out, "gemini", &key, val, risky, &ctx.tilde(&p));
             }
         }
@@ -345,7 +467,11 @@ fn flatten(prefix: &str, v: &Value, out: &mut Vec<(String, String)>) {
     match v {
         Value::Object(m) => {
             for (k, child) in m {
-                let key = if prefix.is_empty() { k.clone() } else { format!("{prefix}.{k}") };
+                let key = if prefix.is_empty() {
+                    k.clone()
+                } else {
+                    format!("{prefix}.{k}")
+                };
                 if k != "mcpServers" {
                     flatten(&key, child, out);
                 }
@@ -371,10 +497,16 @@ pub fn flag_settings(agent: &str, args: &[String]) -> Vec<Setting> {
         let next = args.get(i + 1).map(String::as_str).unwrap_or("");
         let risky = RISKY.contains(&a.as_str())
             || (agent == "gemini" && a == "-y")
-            || (matches!(a.as_str(), "--permission-mode" | "--sandbox" | "--approval-mode" | "-s")
-                && matches!(next, "bypassPermissions" | "danger-full-access" | "yolo"));
+            || (matches!(
+                a.as_str(),
+                "--permission-mode" | "--sandbox" | "--approval-mode" | "-s"
+            ) && matches!(next, "bypassPermissions" | "danger-full-access" | "yolo"));
         if risky {
-            let value = if a.starts_with("--") && RISKY.contains(&a.as_str()) || a == "-y" { "set".into() } else { next.to_string() };
+            let value = if a.starts_with("--") && RISKY.contains(&a.as_str()) || a == "-y" {
+                "set".into()
+            } else {
+                next.to_string()
+            };
             push(&mut out, agent, a, value, true, "command line");
         }
     }
@@ -385,7 +517,9 @@ pub fn flag_settings(agent: &str, args: &[String]) -> Vec<Setting> {
 
 /// Names (never contents) of secret-looking files directly in `dir`.
 pub fn sensitive_files(dir: &Path) -> Vec<String> {
-    let Ok(entries) = fs::read_dir(dir) else { return vec![] };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return vec![];
+    };
     let mut out: Vec<String> = entries
         .filter_map(Result::ok)
         .map(|e| e.file_name().to_string_lossy().into_owned())
@@ -398,11 +532,27 @@ pub fn sensitive_files(dir: &Path) -> Vec<String> {
 pub fn is_sensitive(name: &str) -> bool {
     let l = name.to_ascii_lowercase();
     if l.starts_with(".env") {
-        return !["example", "sample", "template", "dist"].iter().any(|s| l.contains(s));
+        return !["example", "sample", "template", "dist"]
+            .iter()
+            .any(|s| l.contains(s));
     }
-    [".pem", ".key", ".p12", ".pfx", ".keystore", ".jks", ".kdbx"].iter().any(|e| l.ends_with(e))
-        || ["id_rsa", "id_ed25519", "id_ecdsa"].iter().any(|p| l.starts_with(p))
-        || matches!(l.as_str(), ".npmrc" | ".pypirc" | ".netrc" | "credentials" | "credentials.json" | ".aws" | ".ssh" | "wallet.json")
+    [".pem", ".key", ".p12", ".pfx", ".keystore", ".jks", ".kdbx"]
+        .iter()
+        .any(|e| l.ends_with(e))
+        || ["id_rsa", "id_ed25519", "id_ecdsa"]
+            .iter()
+            .any(|p| l.starts_with(p))
+        || matches!(
+            l.as_str(),
+            ".npmrc"
+                | ".pypirc"
+                | ".netrc"
+                | "credentials"
+                | "credentials.json"
+                | ".aws"
+                | ".ssh"
+                | "wallet.json"
+        )
         || (l.ends_with(".json") && (l.contains("keypair") || l.starts_with("service-account")))
 }
 
@@ -412,14 +562,37 @@ mod tests {
 
     #[test]
     fn redacts_secrets_in_commands() {
-        let s = redact_command("npx", &["-y", "@modelcontextprotocol/server-github", "--api-key", "abc", "TOKEN=xyz", "sk-live123"]);
-        assert_eq!(s, "npx -y @modelcontextprotocol/server-github --api-key ••• TOKEN=••• •••");
-        assert_eq!(redact_url("https://mcp.example/sse?api_key=123"), "https://mcp.example/sse?•••");
+        let s = redact_command(
+            "npx",
+            &[
+                "-y",
+                "@modelcontextprotocol/server-github",
+                "--api-key",
+                "abc",
+                "TOKEN=xyz",
+                "sk-live123",
+            ],
+        );
+        assert_eq!(
+            s,
+            "npx -y @modelcontextprotocol/server-github --api-key ••• TOKEN=••• •••"
+        );
+        assert_eq!(
+            redact_url("https://mcp.example/sse?api_key=123"),
+            "https://mcp.example/sse?•••"
+        );
     }
 
     #[test]
     fn sensitive_names() {
-        for n in [".env", ".env.local", "id_ed25519", "server.pem", "my-keypair.json", ".npmrc"] {
+        for n in [
+            ".env",
+            ".env.local",
+            "id_ed25519",
+            "server.pem",
+            "my-keypair.json",
+            ".npmrc",
+        ] {
             assert!(is_sensitive(n), "{n}");
         }
         for n in [".env.example", "README.md", "package.json", "keys.rs"] {
@@ -429,9 +602,13 @@ mod tests {
 
     #[test]
     fn risky_cli_flags() {
-        let args: Vec<String> = ["--dangerously-skip-permissions", "-p", "hi"].map(String::from).to_vec();
+        let args: Vec<String> = ["--dangerously-skip-permissions", "-p", "hi"]
+            .map(String::from)
+            .to_vec();
         assert_eq!(flag_settings("claude", &args).len(), 1);
-        let args: Vec<String> = ["--sandbox", "danger-full-access"].map(String::from).to_vec();
+        let args: Vec<String> = ["--sandbox", "danger-full-access"]
+            .map(String::from)
+            .to_vec();
         assert_eq!(flag_settings("codex", &args)[0].value, "danger-full-access");
         assert!(flag_settings("codex", &["exec".into()]).is_empty());
     }

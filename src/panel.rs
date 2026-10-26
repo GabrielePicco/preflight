@@ -18,7 +18,11 @@ pub struct Painter {
 
 impl Painter {
     pub fn paint(&self, s: &str, st: Style) -> String {
-        if self.color { s.style(st).to_string() } else { s.to_string() }
+        if self.color {
+            s.style(st).to_string()
+        } else {
+            s.to_string()
+        }
     }
     fn dim(&self, s: &str) -> String {
         self.paint(s, Style::new().dimmed())
@@ -30,17 +34,29 @@ impl Painter {
 
 fn pad(s: &str, w: usize) -> String {
     let n = s.chars().count();
-    if n >= w { s.to_string() } else { format!("{s}{}", " ".repeat(w - n)) }
+    if n >= w {
+        s.to_string()
+    } else {
+        format!("{s}{}", " ".repeat(w - n))
+    }
 }
 
 /// Keep the tail of long paths: "…/very/long/AGENTS.md".
 fn shorten(s: &str, w: usize) -> String {
     let n = s.chars().count();
-    if n <= w { s.to_string() } else { format!("…{}", s.chars().skip(n - w + 1).collect::<String>()) }
+    if n <= w {
+        s.to_string()
+    } else {
+        format!("…{}", s.chars().skip(n - w + 1).collect::<String>())
+    }
 }
 
 fn clip(s: &str, w: usize) -> String {
-    if s.chars().count() <= w { s.to_string() } else { format!("{}…", s.chars().take(w - 1).collect::<String>()) }
+    if s.chars().count() <= w {
+        s.to_string()
+    } else {
+        format!("{}…", s.chars().take(w - 1).collect::<String>())
+    }
 }
 
 pub fn render(ctx: &Ctx, r: &Report, color: bool, show_contents: bool) -> String {
@@ -49,14 +65,22 @@ pub fn render(ctx: &Ctx, r: &Report, color: bool, show_contents: bool) -> String
     let rule = p.dim(&"─".repeat(RULE_WIDTH));
     let section = |o: &mut String, title: &str, n: Option<usize>| {
         let count = n.map(|n| format!(" ({n})")).unwrap_or_default();
-        let _ = writeln!(o, "\n {}{}", p.paint(title, Style::new().bold().cyan()), p.dim(&count));
+        let _ = writeln!(
+            o,
+            "\n {}{}",
+            p.paint(title, Style::new().bold().cyan()),
+            p.dim(&count)
+        );
     };
 
     let _ = writeln!(
         o,
         " {} {}",
         p.paint("▲ preflight", Style::new().bold().cyan()),
-        p.dim(&format!("v{} · what your agent is about to inherit", env!("CARGO_PKG_VERSION")))
+        p.dim(&format!(
+            "v{} · what your agent is about to inherit",
+            env!("CARGO_PKG_VERSION")
+        ))
     );
     let _ = writeln!(o, "{rule}");
     let d = &r.discovery;
@@ -64,15 +88,30 @@ pub fn render(ctx: &Ctx, r: &Report, color: bool, show_contents: bool) -> String
         let _ = writeln!(o, "  {} {v}", p.dim(&pad(k, 9)));
     };
     kv(&mut o, "cwd", ctx.tilde(&d.cwd));
-    kv(&mut o, "git root", d.git_root.as_ref().map(|g| ctx.tilde(g)).unwrap_or_else(|| p.dim("none")));
+    kv(
+        &mut o,
+        "git root",
+        d.git_root
+            .as_ref()
+            .map(|g| ctx.tilde(g))
+            .unwrap_or_else(|| p.dim("none")),
+    );
     let first = d.scanned.first().map(|s| ctx.tilde(s)).unwrap_or_default();
     let last = d.scanned.last().map(|s| ctx.tilde(s)).unwrap_or_default();
-    kv(&mut o, "scanned", format!("{} dirs, {first} → {last}", d.scanned.len()));
+    kv(
+        &mut o,
+        "scanned",
+        format!("{} dirs, {first} → {last}", d.scanned.len()),
+    );
     let agents: Vec<String> = r
         .agents
         .iter()
         .map(|a| match (&a.path, &a.version) {
-            (Some(_), Some(v)) => format!("{} {}", p.paint(&a.name, Style::new().bold().green()), p.dim(v)),
+            (Some(_), Some(v)) => format!(
+                "{} {}",
+                p.paint(&a.name, Style::new().bold().green()),
+                p.dim(v)
+            ),
             (Some(_), None) => p.paint(&a.name, Style::new().bold().green()),
             (None, _) => p.dim(&format!("{} not found", a.name)),
         })
@@ -84,9 +123,19 @@ pub fn render(ctx: &Ctx, r: &Report, color: bool, show_contents: bool) -> String
     // Instruction files
     section(&mut o, "INSTRUCTION FILES", Some(r.files.len()));
     if r.files.is_empty() {
-        let _ = writeln!(o, "  {}", p.dim("none found between cwd and the top of the walk"));
+        let _ = writeln!(
+            o,
+            "  {}",
+            p.dim("none found between cwd and the top of the walk")
+        );
     }
-    let path_w = r.files.iter().map(|f| ctx.tilde(&f.path).chars().count()).max().unwrap_or(0).min(48);
+    let path_w = r
+        .files
+        .iter()
+        .map(|f| ctx.tilde(&f.path).chars().count())
+        .max()
+        .unwrap_or(0)
+        .min(48);
     for f in &r.files {
         let (icon, badge, st) = match f.state {
             TrustState::Trusted => ("✓", "TRUSTED", Style::new().green()),
@@ -98,17 +147,31 @@ pub fn render(ctx: &Ctx, r: &Report, color: bool, show_contents: bool) -> String
             tags.push(p.paint("⬇ downloaded", Style::new().magenta().bold()));
         }
         let flags = {
-            let mut rules: Vec<&str> = f.hits.iter().filter(|h| h.severity >= Severity::Medium).map(|h| h.rule).collect();
+            let mut rules: Vec<&str> = f
+                .hits
+                .iter()
+                .filter(|h| h.severity >= Severity::Medium)
+                .map(|h| h.rule)
+                .collect();
             rules.sort_unstable();
             rules.dedup();
             rules.len()
         };
         if flags > 0 {
-            tags.push(p.paint(&format!("⚑ {flags} flag{}", if flags == 1 { "" } else { "s" }), Style::new().yellow()));
+            tags.push(p.paint(
+                &format!("⚑ {flags} flag{}", if flags == 1 { "" } else { "s" }),
+                Style::new().yellow(),
+            ));
         }
         let path = pad(&shorten(&ctx.tilde(&f.path), 48), path_w);
         let path = if f.untrusted() { p.bold(&path) } else { path };
-        let _ = writeln!(o, "  {} {} {path}  {}", p.paint(icon, st), p.paint(&pad(badge, 8), st), tags.join("  "));
+        let _ = writeln!(
+            o,
+            "  {} {} {path}  {}",
+            p.paint(icon, st),
+            p.paint(&pad(badge, 8), st),
+            tags.join("  ")
+        );
     }
 
     // MCP servers
@@ -116,7 +179,13 @@ pub fn render(ctx: &Ctx, r: &Report, color: bool, show_contents: bool) -> String
     if r.mcp.is_empty() {
         let _ = writeln!(o, "  {}", p.dim("none configured"));
     }
-    let name_w = r.mcp.iter().map(|m| m.name.chars().count()).max().unwrap_or(0).min(16);
+    let name_w = r
+        .mcp
+        .iter()
+        .map(|m| m.name.chars().count())
+        .max()
+        .unwrap_or(0)
+        .min(16);
     for m in &r.mcp {
         let _ = writeln!(
             o,
@@ -134,9 +203,23 @@ pub fn render(ctx: &Ctx, r: &Report, color: bool, show_contents: bool) -> String
         let _ = writeln!(o, "  {}", p.dim("no permission overrides found"));
     }
     for s in &r.settings {
-        let icon = if s.risky { p.paint("!", Style::new().red().bold()) } else { p.dim("·") };
-        let value = if s.risky { p.paint(&clip(&s.value, 40), Style::new().red()) } else { clip(&s.value, 40) };
-        let _ = writeln!(o, "  {icon} {} {} = {value}  {}", p.dim(&pad(&s.agent, 6)), s.key, p.dim(&s.source));
+        let icon = if s.risky {
+            p.paint("!", Style::new().red().bold())
+        } else {
+            p.dim("·")
+        };
+        let value = if s.risky {
+            p.paint(&clip(&s.value, 40), Style::new().red())
+        } else {
+            clip(&s.value, 40)
+        };
+        let _ = writeln!(
+            o,
+            "  {icon} {} {} = {value}  {}",
+            p.dim(&pad(&s.agent, 6)),
+            s.key,
+            p.dim(&s.source)
+        );
     }
 
     // Secrets
@@ -144,8 +227,17 @@ pub fn render(ctx: &Ctx, r: &Report, color: bool, show_contents: bool) -> String
     if r.sensitive.is_empty() {
         let _ = writeln!(o, "  {}", p.dim("no secret-looking files in cwd"));
     } else {
-        let names: Vec<String> = r.sensitive.iter().map(|n| p.paint(n, Style::new().yellow())).collect();
-        let _ = writeln!(o, "  {} {}", p.paint("!", Style::new().yellow().bold()), names.join("  "));
+        let names: Vec<String> = r
+            .sensitive
+            .iter()
+            .map(|n| p.paint(n, Style::new().yellow()))
+            .collect();
+        let _ = writeln!(
+            o,
+            "  {} {}",
+            p.paint("!", Style::new().yellow().bold()),
+            names.join("  ")
+        );
     }
 
     // Contents of untrusted files
@@ -162,9 +254,16 @@ pub fn render(ctx: &Ctx, r: &Report, color: bool, show_contents: bool) -> String
             let what = if r.files.is_empty() {
                 "no instruction files in reach".to_string()
             } else {
-                format!("all {} instruction files match their trusted hashes", r.files.len())
+                format!(
+                    "all {} instruction files match their trusted hashes",
+                    r.files.len()
+                )
             };
-            let _ = writeln!(o, "  {}  {what}", p.paint(" GO ", Style::new().black().on_green().bold()));
+            let _ = writeln!(
+                o,
+                "  {}  {what}",
+                p.paint(" GO ", Style::new().black().on_green().bold())
+            );
         }
         Verdict::Blocked => {
             let n = r.reasons.len();
@@ -175,15 +274,30 @@ pub fn render(ctx: &Ctx, r: &Report, color: bool, show_contents: bool) -> String
                 if n == 1 { "" } else { "s" }
             );
             for reason in &r.reasons {
-                let _ = writeln!(o, "     {} {}", p.paint("•", Style::new().red()), clip(reason, LINE_WIDTH - 7));
+                let _ = writeln!(
+                    o,
+                    "     {} {}",
+                    p.paint("•", Style::new().red()),
+                    clip(reason, LINE_WIDTH - 7)
+                );
             }
         }
     }
     for w in &r.warnings {
-        let _ = writeln!(o, "     {} {}", p.paint("⚠", Style::new().yellow()), clip(w, LINE_WIDTH - 7));
+        let _ = writeln!(
+            o,
+            "     {} {}",
+            p.paint("⚠", Style::new().yellow()),
+            clip(w, LINE_WIDTH - 7)
+        );
     }
     if r.verdict == Verdict::Blocked {
-        let _ = writeln!(o, "     {} {}", p.dim("review the file(s) above, then run:"), p.bold("preflight trust"));
+        let _ = writeln!(
+            o,
+            "     {} {}",
+            p.dim("review the file(s) above, then run:"),
+            p.bold("preflight trust")
+        );
     }
     o
 }
@@ -195,7 +309,13 @@ fn excerpt(ctx: &Ctx, f: &FileReport, p: &Painter, o: &mut String) {
         "\n {} {}  {}",
         p.paint("▸", Style::new().red().bold()),
         p.bold(&ctx.tilde(&f.path)),
-        p.dim(&format!("{} · {} line{} · sha256 {}…", f.state.as_str(), lines.len(), if lines.len() == 1 { "" } else { "s" }, &f.sha256[..12]))
+        p.dim(&format!(
+            "{} · {} line{} · sha256 {}…",
+            f.state.as_str(),
+            lines.len(),
+            if lines.len() == 1 { "" } else { "s" },
+            &f.sha256[..12]
+        ))
     );
     let hit_lines: BTreeSet<usize> = f.hits.iter().map(|h| h.line).collect();
     let show: BTreeSet<usize> = if lines.len() <= 14 {
@@ -220,11 +340,19 @@ fn excerpt(ctx: &Ctx, f: &FileReport, p: &Painter, o: &mut String) {
         last = n;
     }
     if lines.len() > last {
-        let _ = writeln!(o, "  {}", p.dim(&format!("      … {} more lines", lines.len() - last)));
+        let _ = writeln!(
+            o,
+            "  {}",
+            p.dim(&format!("      … {} more lines", lines.len() - last))
+        );
     }
-    let mut by_rule: BTreeMap<(std::cmp::Reverse<Severity>, &str), BTreeSet<usize>> = BTreeMap::new();
+    let mut by_rule: BTreeMap<(std::cmp::Reverse<Severity>, &str), BTreeSet<usize>> =
+        BTreeMap::new();
     for h in &f.hits {
-        by_rule.entry((std::cmp::Reverse(h.severity), h.label)).or_default().insert(h.line);
+        by_rule
+            .entry((std::cmp::Reverse(h.severity), h.label))
+            .or_default()
+            .insert(h.line);
     }
     for ((sev, label), ls) in by_rule {
         let (tag, st) = match sev.0 {
@@ -233,14 +361,21 @@ fn excerpt(ctx: &Ctx, f: &FileReport, p: &Painter, o: &mut String) {
             Severity::Low => ("low ", Style::new().cyan()),
         };
         let ls: Vec<String> = ls.iter().map(|l| format!("L{l}")).collect();
-        let _ = writeln!(o, "     {} {} {}", p.paint(&format!("⚑ {tag}"), st), label, p.dim(&ls.join(" ")));
+        let _ = writeln!(
+            o,
+            "     {} {} {}",
+            p.paint(&format!("⚑ {tag}"), st),
+            label,
+            p.dim(&ls.join(" "))
+        );
     }
 }
 
 /// Make every character visible: control and invisible Unicode chars become ⟨U+XXXX⟩, so a
 /// file can't hide text or inject terminal escapes into the panel.
 fn visible(ch: char) -> String {
-    let invisible = matches!(ch as u32, 0x200B..=0x200F | 0x202A..=0x202E | 0x2060..=0x2064 | 0xFEFF);
+    let invisible =
+        matches!(ch as u32, 0x200B..=0x200F | 0x202A..=0x202E | 0x2060..=0x2064 | 0xFEFF);
     if ch == '\t' {
         "  ".into()
     } else if ch.is_control() || invisible {
@@ -275,12 +410,20 @@ fn render_line(line: &str, hits: &[&Hit], p: &Painter) -> String {
             out.push_str(&p.dim("…"));
             return out;
         }
-        let sev = hits.iter().filter(|h| i >= h.start && i < h.end).map(|h| h.severity).max();
+        let sev = hits
+            .iter()
+            .filter(|h| i >= h.start && i < h.end)
+            .map(|h| h.severity)
+            .max();
         if sev != cur {
             flush(&mut out, &mut buf, cur);
             cur = sev;
         }
-        let v = if masks.iter().any(|r| r.contains(&i)) { "•".to_string() } else { visible(ch) };
+        let v = if masks.iter().any(|r| r.contains(&i)) {
+            "•".to_string()
+        } else {
+            visible(ch)
+        };
         width += v.chars().count();
         buf.push_str(&v);
     }
@@ -295,7 +438,10 @@ fn secret_ranges(line: &str) -> Vec<std::ops::Range<usize>> {
     let re = RE.get_or_init(|| {
         regex::Regex::new(r"(ghp_|gho_|ghs_|github_pat_|sk-|sk_live_|xox[abprs]-|AKIA|glpat-|hf_)([A-Za-z0-9_\-]{4,})").unwrap()
     });
-    re.captures_iter(line).filter_map(|c| c.get(2)).map(|m| m.range()).collect()
+    re.captures_iter(line)
+        .filter_map(|c| c.get(2))
+        .map(|m| m.range())
+        .collect()
 }
 
 pub fn render_changes(ctx: &Ctx, changes: &[Change], color: bool) -> String {
@@ -303,14 +449,25 @@ pub fn render_changes(ctx: &Ctx, changes: &[Change], color: bool) -> String {
     let p = Painter { color };
     let mut o = String::new();
     if changes.is_empty() {
-        let _ = writeln!(o, " {} {}", p.paint("▲ preflight", Style::new().bold().cyan()), p.dim("agent exited · no config, MCP or shell rc changes"));
+        let _ = writeln!(
+            o,
+            " {} {}",
+            p.paint("▲ preflight", Style::new().bold().cyan()),
+            p.dim("agent exited · no config, MCP or shell rc changes")
+        );
         return o;
     }
     let _ = writeln!(
         o,
         " {} {}",
         p.paint("▲ preflight", Style::new().bold().cyan()),
-        p.paint(&format!("agent exited · {} watched file(s) changed during the run", changes.len()), Style::new().yellow().bold())
+        p.paint(
+            &format!(
+                "agent exited · {} watched file(s) changed during the run",
+                changes.len()
+            ),
+            Style::new().yellow().bold()
+        )
     );
     for c in changes {
         let (tag, path, st) = match c {
@@ -320,7 +477,11 @@ pub fn render_changes(ctx: &Ctx, changes: &[Change], color: bool) -> String {
         };
         let _ = writeln!(o, "   {} {path}", p.paint(tag, st));
     }
-    let _ = writeln!(o, "   {}", p.dim("review these; changed instruction files will need `preflight trust` again"));
+    let _ = writeln!(
+        o,
+        "   {}",
+        p.dim("review these; changed instruction files will need `preflight trust` again")
+    );
     o
 }
 
@@ -331,7 +492,10 @@ mod tests {
     #[test]
     fn escapes_invisible_and_control_chars() {
         let p = Painter { color: false };
-        assert_eq!(render_line("a\u{1b}[2Jb\u{200B}c", &[], &p), "a⟨U+001B⟩[2Jb⟨U+200B⟩c");
+        assert_eq!(
+            render_line("a\u{1b}[2Jb\u{200B}c", &[], &p),
+            "a⟨U+001B⟩[2Jb⟨U+200B⟩c"
+        );
         assert_eq!(render_line("token ghp_abcdef", &[], &p), "token ghp_••••••");
     }
 
