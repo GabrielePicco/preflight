@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main, prep-share]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable Rust
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - run: cargo +stable fmt --check
+      - run: cargo +stable build --release --locked
+      - run: cargo +stable test --locked
+      - run: cargo +stable clippy --locked --all-targets -- -D warnings
+      - run: ./demo/demo.sh
+
+  windows-build:
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal
+      - run: cargo +stable build --release --locked

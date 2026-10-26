@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerates demo/status-blocked.png and demo/status-go.png (needs python3 + google-chrome/chromium).
+# Regenerates demo/status-blocked.png and demo/status-go.png (needs python3 + Chrome/Chromium).
 set -euo pipefail
 cd "$(dirname "$0")"
 DEMO="$PWD"
@@ -7,7 +7,11 @@ BIN="$DEMO/../target/release/preflight"
 SETUP_ONLY=1 ./demo.sh
 export HOME="$DEMO/sandbox/home" XDG_CONFIG_HOME="$DEMO/sandbox/home/.config" XDG_STATE_HOME="$DEMO/sandbox/home/.local/state"
 export PREFLIGHT_TEMP_ROOTS="" PATH="$DEMO/sandbox/bin:$PATH"
-CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+CHROME="${CHROME:-$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)}"
+if [ -z "$CHROME" ] && [ -x "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ]; then
+  CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+fi
+[ -x "$CHROME" ] || { echo "Set CHROME to a Chrome/Chromium executable" >&2; exit 1; }
 cd "$HOME/Downloads/cool-repo"
 
 shot() { # name, height, command...

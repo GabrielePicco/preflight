@@ -80,7 +80,12 @@ pub fn discover(cwd: &Path, home: Option<&Path>) -> Discovery {
     }
     let mut seen = std::collections::HashSet::new();
     files.retain(|f| seen.insert(f.path.canonicalize().unwrap_or_else(|_| f.path.clone())));
-    Discovery { cwd, git_root, scanned, files }
+    Discovery {
+        cwd,
+        git_root,
+        scanned,
+        files,
+    }
 }
 
 fn scan_dir(d: &Path, out: &mut Vec<Found>) {
@@ -102,7 +107,12 @@ fn scan_dir(d: &Path, out: &mut Vec<Found>) {
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())
             .take(MAX_DIR_FILES)
-            .for_each(|e| out.push(Found { path: e.into_path(), pattern }));
+            .for_each(|e| {
+                out.push(Found {
+                    path: e.into_path(),
+                    pattern,
+                })
+            });
     }
 }
 
@@ -128,11 +138,21 @@ mod tests {
         let names: Vec<String> = d
             .files
             .iter()
-            .map(|f| f.path.strip_prefix(home.canonicalize().unwrap()).unwrap().display().to_string())
+            .map(|f| {
+                f.path
+                    .strip_prefix(home.canonicalize().unwrap())
+                    .unwrap()
+                    .display()
+                    .to_string()
+            })
             .collect();
         assert_eq!(
             names,
-            vec!["Downloads/repo/CLAUDE.md", "Downloads/repo/.cursor/rules/style.mdc", "Downloads/AGENTS.md"]
+            vec![
+                "Downloads/repo/CLAUDE.md",
+                "Downloads/repo/.cursor/rules/style.mdc",
+                "Downloads/AGENTS.md"
+            ]
         );
         assert_eq!(d.git_root.unwrap(), repo.canonicalize().unwrap());
         assert_eq!(d.scanned.last().unwrap(), &home.canonicalize().unwrap());

@@ -43,16 +43,28 @@ pub enum Change {
 }
 
 pub fn take(ctx: &Ctx, cwd: &Path) -> Snapshot {
-    let mut paths: Vec<PathBuf> = discover(cwd, ctx.home.as_deref()).files.into_iter().map(|f| f.path).collect();
+    let mut paths: Vec<PathBuf> = discover(cwd, ctx.home.as_deref())
+        .files
+        .into_iter()
+        .map(|f| f.path)
+        .collect();
     if let Some(h) = &ctx.home {
         paths.extend(WATCHED_HOME_FILES.iter().map(|r| h.join(r)));
     }
     let mut snap = Snapshot::new();
     for p in paths {
         let is_claude_json = p.file_name().is_some_and(|n| n == ".claude.json");
-        let hash = if is_claude_json { claude_json_digest(&p) } else { sha256_file(&p).ok() };
+        let hash = if is_claude_json {
+            claude_json_digest(&p)
+        } else {
+            sha256_file(&p).ok()
+        };
         if let Some(h) = hash {
-            let label = if is_claude_json { format!("{} (MCP servers / trust)", ctx.tilde(&p)) } else { ctx.tilde(&p) };
+            let label = if is_claude_json {
+                format!("{} (MCP servers / trust)", ctx.tilde(&p))
+            } else {
+                ctx.tilde(&p)
+            };
             snap.insert(label, h);
         }
     }
@@ -88,7 +100,12 @@ pub fn diff(before: &Snapshot, after: &Snapshot) -> Vec<Change> {
             _ => {}
         }
     }
-    out.extend(before.keys().filter(|k| !after.contains_key(*k)).map(|k| Change::Removed(k.clone())));
+    out.extend(
+        before
+            .keys()
+            .filter(|k| !after.contains_key(*k))
+            .map(|k| Change::Removed(k.clone())),
+    );
     out
 }
 
@@ -101,7 +118,12 @@ mod tests {
     fn detects_added_modified_removed() {
         let t = tempfile::tempdir().unwrap();
         let home = t.path().canonicalize().unwrap();
-        let ctx = Ctx { home: Some(home.clone()), trust_file: "/x".into(), log_file: "/y".into(), temp_roots: vec![] };
+        let ctx = Ctx {
+            home: Some(home.clone()),
+            trust_file: "/x".into(),
+            log_file: "/y".into(),
+            temp_roots: vec![],
+        };
         fs::write(home.join(".bashrc"), "a").unwrap();
         fs::write(home.join(".zshrc"), "z").unwrap();
         let before = take(&ctx, &home);
@@ -125,12 +147,29 @@ mod tests {
     fn claude_json_noise_is_ignored() {
         let t = tempfile::tempdir().unwrap();
         let home = t.path().canonicalize().unwrap();
-        let ctx = Ctx { home: Some(home.clone()), trust_file: "/x".into(), log_file: "/y".into(), temp_roots: vec![] };
-        fs::write(home.join(".claude.json"), r#"{"numStartups":1,"mcpServers":{}}"#).unwrap();
+        let ctx = Ctx {
+            home: Some(home.clone()),
+            trust_file: "/x".into(),
+            log_file: "/y".into(),
+            temp_roots: vec![],
+        };
+        fs::write(
+            home.join(".claude.json"),
+            r#"{"numStartups":1,"mcpServers":{}}"#,
+        )
+        .unwrap();
         let a = take(&ctx, &home);
-        fs::write(home.join(".claude.json"), r#"{"numStartups":2,"mcpServers":{}}"#).unwrap();
+        fs::write(
+            home.join(".claude.json"),
+            r#"{"numStartups":2,"mcpServers":{}}"#,
+        )
+        .unwrap();
         assert!(diff(&a, &take(&ctx, &home)).is_empty());
-        fs::write(home.join(".claude.json"), r#"{"numStartups":2,"mcpServers":{"x":{"command":"evil"}}}"#).unwrap();
+        fs::write(
+            home.join(".claude.json"),
+            r#"{"numStartups":2,"mcpServers":{"x":{"command":"evil"}}}"#,
+        )
+        .unwrap();
         assert_eq!(diff(&a, &take(&ctx, &home)).len(), 1);
     }
 }

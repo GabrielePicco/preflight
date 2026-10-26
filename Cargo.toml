@@ -1,15 +1,22 @@
 [package]
-name = "preflight"
+name = "agent-preflight"
 version = "0.1.0"
 edition = "2024"
 authors = ["Gabriele Picco <piccogabriele@gmail.com>"]
 repository = "https://github.com/GabrielePicco/preflight"
-publish = false
 description = "Pre-flight guard for coding agents: blocks launch when untrusted instruction files are in reach"
 license = "MIT"
 readme = "README.md"
 keywords = ["security", "ai-agents", "codex", "claude-code", "cli"]
 categories = ["command-line-utilities"]
+exclude = ["demo/sandbox/**", "demo/*.png", "demo/*.cast", ".github/**"]
+
+[lib]
+name = "preflight"
+
+[[bin]]
+name = "preflight"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.104"
@@ -25,6 +32,9 @@ walkdir = "2.5.0"
 
 [target."cfg(unix)".dependencies]
 xattr = "1.6.1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+plist = "1.8"
 
 [dev-dependencies]
 tempfile = "3.27.0"

@@ -24,6 +24,8 @@ impl Env {
             .env("HOME", &self.home)
             .env_remove("XDG_CONFIG_HOME")
             .env_remove("XDG_STATE_HOME")
+            .env_remove("PREFLIGHT_TRUST_FILE")
+            .env_remove("PREFLIGHT_LOG_FILE")
             .env("PREFLIGHT_TEMP_ROOTS", "")
             .env("NO_COLOR", "1")
             .output()
@@ -92,11 +94,25 @@ fn blocked_run_never_launches_the_agent() {
     let e = Env::new();
     let proj = e.project("Downloads/x", PLANTED);
     let marker = proj.join("launched");
-    let o = e.cmd(&proj, &["run", "--no-version", "--", "sh", "-c", "touch launched"]);
+    let o = e.cmd(
+        &proj,
+        &["run", "--no-version", "--", "sh", "-c", "touch launched"],
+    );
     assert_eq!(o.status.code(), Some(3), "{}", stderr(&o));
     assert!(!marker.exists());
 
-    let o = e.cmd(&proj, &["run", "--force", "--no-version", "--", "sh", "-c", "touch launched"]);
+    let o = e.cmd(
+        &proj,
+        &[
+            "run",
+            "--force",
+            "--no-version",
+            "--",
+            "sh",
+            "-c",
+            "touch launched",
+        ],
+    );
     assert_eq!(o.status.code(), Some(0), "{}", stderr(&o));
     assert!(marker.exists());
 }
@@ -108,7 +124,17 @@ fn go_run_execs_and_reports_config_changes() {
     fs::write(e.home.join(".bashrc"), "# rc\n").unwrap();
     assert!(e.cmd(&proj, &["trust"]).status.success());
 
-    let o = e.cmd(&proj, &["run", "--no-version", "--", "sh", "-c", "echo 'alias ls=x' >> \"$HOME/.bashrc\"; exit 7"]);
+    let o = e.cmd(
+        &proj,
+        &[
+            "run",
+            "--no-version",
+            "--",
+            "sh",
+            "-c",
+            "echo 'alias ls=x' >> \"$HOME/.bashrc\"; exit 7",
+        ],
+    );
     assert_eq!(o.status.code(), Some(7), "exit code is passed through");
     let err = stderr(&o);
     assert!(err.contains("GO"), "{err}");
@@ -117,7 +143,12 @@ fn go_run_execs_and_reports_config_changes() {
     let log = fs::read_to_string(e.home.join(".local/state/preflight/log.jsonl")).unwrap();
     let actions: Vec<String> = log
         .lines()
-        .map(|l| serde_json::from_str::<serde_json::Value>(l).unwrap()["action"].as_str().unwrap().to_string())
+        .map(|l| {
+            serde_json::from_str::<serde_json::Value>(l).unwrap()["action"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        })
         .collect();
     assert_eq!(actions, vec!["trust", "run", "exit"]);
 }
@@ -132,7 +163,11 @@ fn panel_shows_mcp_servers_permissions_and_secrets() {
     )
     .unwrap();
     fs::create_dir_all(e.home.join(".codex")).unwrap();
-    fs::write(e.home.join(".codex/config.toml"), "sandbox_mode = \"danger-full-access\"\n[mcp_servers.docs]\ncommand = \"docs-mcp\"\n").unwrap();
+    fs::write(
+        e.home.join(".codex/config.toml"),
+        "sandbox_mode = \"danger-full-access\"\n[mcp_servers.docs]\ncommand = \"docs-mcp\"\n",
+    )
+    .unwrap();
     fs::write(proj.join(".env"), "SECRET=1").unwrap();
 
     let o = e.cmd(&proj, &["status", "--no-version"]);
@@ -142,7 +177,10 @@ fn panel_shows_mcp_servers_permissions_and_secrets() {
     assert!(out.contains("docs-mcp"), "{out}");
     assert!(out.contains("sandbox_mode = danger-full-access"), "{out}");
     assert!(out.contains(".env"), "{out}");
-    assert!(!out.contains("SECRET=1"), "secret file contents are never read: {out}");
+    assert!(
+        !out.contains("SECRET=1"),
+        "secret file contents are never read: {out}"
+    );
 }
 
 #[test]
@@ -153,4 +191,70 @@ fn init_shell_prints_aliases() {
     assert!(out.contains("alias codex='preflight run -- codex'"));
     assert!(out.contains("alias claude='preflight run -- claude'"));
     assert!(out.contains("alias gemini='preflight run -- gemini'"));
+}
+
+#[test]
+fn reads_user_and_project_config_formats() {
+    let e = Env::new();
+    let proj = e.project("code/app", "Review changes.\n");
+    for dir in [".claude", ".codex", ".gemini"] {
+        fs::create_dir_all(e.home.join(dir)).unwrap();
+    }
+    let claude = serde_json::json!({
+        "mcpServers": {"user-docs": {"url": "https://example.com/mcp"}},
+        "projects": {proj.to_string_lossy().to_string(): {
+            "hasTrustDialogAccepted": true,
+            "mcpServers": {"project-docs": {"command": "docs-mcp"}}
+        }}
+    });
+    fs::write(e.home.join(".claude.json"), claude.to_string()).unwrap();
+    fs::write(
+        e.home.join(".claude/settings.json"),
+        r#"{
+        "permissions": {"defaultMode": "default", "allow": ["Read"]},
+        "hooks": {"Stop": []}
+    }"#,
+    )
+    .unwrap();
+    let project_key = toml::Value::String(proj.to_string_lossy().into_owned());
+    fs::write(
+        e.home.join(".codex/config.toml"),
+        format!(
+            r#"
+sandbox_mode = "workspace-write"
+[mcp_servers.remote-docs]
+url = "https://example.com/mcp"
+[projects.{project_key}]
+trust_level = "trusted"
+"#
+        ),
+    )
+    .unwrap();
+    fs::write(
+        e.home.join(".gemini/settings.json"),
+        r#"{
+        "mcpServers": {"gemini-docs": {"httpUrl": "https://example.com/mcp"}},
+        "security": {"folderTrust": {"enabled": true}},
+        "tools": {"sandbox": true, "autoAccept": false}
+    }"#,
+    )
+    .unwrap();
+    let o = e.cmd(&proj, &["status", "--no-version", "--no-contents"]);
+    assert_eq!(o.status.code(), Some(3));
+    let out = stdout(&o);
+    for expected in [
+        "user-docs",
+        "project-docs",
+        "remote-docs",
+        "gemini-docs",
+        "accepted for ~/code/app",
+        "trust_level = trusted for ~/code/app",
+        "allow = 1 rules: Read",
+        "hooks = Stop",
+        "tools.autoAccept = false",
+        "security.folderTrust.enabled = true",
+        "tools.sandbox = true",
+    ] {
+        assert!(out.contains(expected), "missing {expected}: {out}");
+    }
 }
