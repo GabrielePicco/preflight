@@ -18,7 +18,7 @@ with (demo / "demo.cast").open("w") as recording:
     while chunk := process.stdout.read1(65536):
         text = chunk.decode("utf-8").replace("\n", "\r\n")
         # Defense in depth: only demo output belongs in this recording.
-        if "/Users/" in text or "/home/box" in text or "/workspace/" in text:
+        if str(demo.parent) in text or str(Path.home()) in text:
             process.terminate()
             raise SystemExit("Refusing to record an absolute machine path")
         recording.write(json.dumps([round(time.monotonic() - start, 3), "o", text]) + "\n")
