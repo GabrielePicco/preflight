@@ -1,7 +1,5 @@
 # preflight
 
-![preflight status: BLOCKED](demo/status-blocked.png)
-
 **A pre-flight check for coding agents.** Before `codex`, `claude` or `gemini` starts, `preflight`
 shows supported instruction files, MCP servers, permission settings and secret-looking filenames
 in reach, and **refuses to launch** if any instruction file is new or has changed since you last
@@ -34,22 +32,21 @@ detection-and-prevention tool written in response. It is not affiliated with Ope
 
 ## Install
 
+Install the published package from crates.io with Cargo (recommended):
+
 ```sh
 cargo install agent-preflight --locked
 preflight --help
 ```
 
-Or install from GitHub (requires access while the repository is private):
+Alternatively, build from GitHub or a local checkout:
 
 ```sh
-cargo install --git https://github.com/GabrielePicco/preflight --branch prep-share --locked agent-preflight
+cargo install --git https://github.com/GabrielePicco/preflight --locked agent-preflight
 # Or from a checkout:
 cargo install --path . --locked
 preflight --help
 ```
-
-Homebrew installation is coming. The GitHub repository remains private until an
-explicit visibility decision; `prep-share` is the unmerged preparation branch.
 
 Optional: route your agents through preflight automatically.
 
@@ -87,10 +84,6 @@ Flags: `--color auto|always|never`, `status --no-contents`, `status --no-version
 | SECRETS IN REACH | `.env*`, `*.pem`, `id_rsa`, `credentials.json`, ... by **name only**; contents are never read |
 | excerpts | full text of every untrusted file with suspicious spans highlighted; invisible and control characters shown as `⟨U+200B⟩` |
 | verdict | `GO` or `BLOCKED`, the reasons, and warnings |
-
-After trusting:
-
-![preflight status: GO](demo/status-go.png)
 
 ### What it checks
 
@@ -169,32 +162,11 @@ What preflight adds on top:
   (quarantine and binary-plist WhereFroms). Windows Zone.Identifier remains unverified.
   `git clone` doesn't set these marks at all.
 - **The secrets list is by name.** It doesn't scan file contents, so it's a reminder, not a DLP tool.
-- **Real setup coverage is limited.** On macOS, `status` was checked in a real project with
-  `~/.claude.json`, `~/.claude/settings.json`, and `~/.codex/config.toml`: Codex MCP entries and
-  project trust, and Claude permission rules, hooks, and folder trust were read successfully.
-  Version probes were exercised, but actual agent sessions and their trust enforcement were
-  not tested. No real `~/.gemini/settings.json` was present; Gemini uses synthetic fixtures.
-  Unknown config keys, profiles, and precedence remain best-effort.
-- **Output is private by default.** Redaction is heuristic: paths, project names, URLs, and
-  unrecognized secrets can appear. Never share real-setup screenshots or logs; use the demo sandbox.
-
-## Demo
-
-[Download the 22-second terminal recording](demo/demo.cast) and play it locally with
-`asciinema play demo/demo.cast`. It is recorded from `demo/demo.sh` with only fake
-configs and the stub agent; no recording is uploaded to an external service.
-
-```sh
-cargo build --release
-./demo/demo.sh             # status BLOCKED -> run refused -> trust -> GO -> run -> edit -> CHANGED
-./demo/screenshots.sh      # regenerates demo/*.png (needs python3 and Chrome/Chromium)
-python3 demo/record.py     # regenerates demo/demo.cast (no additional recording tool needed)
-```
-
-The demo builds a fake `$HOME` under `demo/sandbox/` with a "downloaded" repo whose `AGENTS.md`
-hides a comment telling the agent to run `echo PWNED > /tmp/preflight-canary`. That is a harmless
-canary. preflight only displays it, and the script checks at the end that the canary file was never
-created. The `codex` used in the demo is a stub shell script that just prints a line.
+- **Config coverage is limited.** Codex and Claude config parsing has been checked on macOS;
+  Gemini uses synthetic fixtures. Actual agent sessions and their trust enforcement have not
+  been tested. Unknown config keys, profiles, and precedence remain best-effort.
+- **Output can contain sensitive information.** Redaction is heuristic: paths, project names,
+  URLs, and unrecognized secrets can appear. Review output before sharing it.
 
 ## Development
 
@@ -206,13 +178,13 @@ cargo clippy --locked --all-targets -- -D warnings
 
 Exit codes: `0` GO, `3` BLOCKED, `2` error. `run` returns the agent's own exit code.
 
-## Release preparation
+## Build artifacts
 
 CI builds, tests, and lints on Ubuntu and macOS. Windows has a build-only job whose
 failure is allowed. The tag-triggered workflow packages macOS arm64, macOS x86_64,
 and Linux x86_64 (glibc) binaries with SHA-256 checksums as workflow artifacts.
 It does not create GitHub Releases or publish packages. Binaries are not signed or
-notarized. Tags, releases, and public visibility require separate approval.
+notarized.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and
 [CHANGELOG.md](CHANGELOG.md).

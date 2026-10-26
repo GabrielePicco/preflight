@@ -1,7 +1,6 @@
 name: Build release artifacts
 
-# Build-only preparation: pushing a tag requires the owner's explicit approval.
-# This workflow never creates a GitHub Release or publishes a package.
+# Builds workflow artifacts without publishing releases or packages.
 on:
   push:
     tags: ['v*']

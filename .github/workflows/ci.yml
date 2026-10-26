@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, prep-share]
+    branches: [main]
   pull_request:
 
 permissions:
@@ -23,7 +23,6 @@ jobs:
       - run: cargo +stable build --release --locked
       - run: cargo +stable test --locked
       - run: cargo +stable clippy --locked --all-targets -- -D warnings
-      - run: ./demo/demo.sh
 
   windows-build:
     runs-on: windows-latest

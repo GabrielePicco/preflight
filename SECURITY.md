@@ -9,6 +9,6 @@ and minimal reproduction steps using synthetic files. Never send real credential
 private agent configs, or a working exploit. Coordinate disclosure with the maintainer
 before publishing details. There is no guaranteed response deadline.
 
-The current development version is 0.1.0. preflight is a pre-launch review tool,
+preflight is a pre-launch review tool,
 not a sandbox or a complete security boundary. Its heuristics and config readers
 are best-effort; see the README limitations.
